@@ -5,17 +5,27 @@ import org.bukkit.entity.Player;
 import org.getchunky.chunky.Chunky;
 import org.getchunky.chunky.ChunkyManager;
 import org.getchunky.chunky.exceptions.ChunkyPlayerOfflineException;
+import org.getchunky.chunky.module.ChunkyPermissions;
+import org.getchunky.chunky.object.ChunkyChunk;
 import org.getchunky.chunky.object.ChunkyObject;
 import org.getchunky.chunky.object.ChunkyPlayer;
 import org.getchunky.chunkyvillage.ChunkyTownManager;
 import org.getchunky.chunkyvillage.config.Config;
 import org.getchunky.register.payment.Method;
+import org.json.JSONArray;
 import org.json.JSONObject;
+
+import java.util.HashSet;
 
 
 public class ChunkyResident {
 
     private ChunkyPlayer chunkyPlayer = null;
+
+    private static String LAST_JOIN = "lastJoin";
+    private static String PLAY_TIME = "playTime";
+    private static String TITLE = "title";
+    private static String TOWN = "town";
 
     public ChunkyResident(ChunkyObject chunkyObject) {
         chunkyPlayer = (ChunkyPlayer)chunkyObject;
@@ -39,7 +49,19 @@ public class ChunkyResident {
     }
 
     public ChunkyTown getTown() {
-        return ChunkyTownManager.getTown(chunkyPlayer);
+        String townName = getData().optString(TOWN);
+        if (townName.isEmpty()) return null;
+        return ChunkyTownManager.getTown(townName);
+    }
+
+    public boolean hasTown() {
+        return getData().has(TOWN);
+    }
+
+    protected ChunkyResident setTown(ChunkyTown town) {
+        if (town == null) getData().remove(TOWN);
+        else getData().put(TOWN, town.getName());
+        return this;
     }
 
     public ChunkyPlayer getChunkyPlayer() {
@@ -48,18 +70,18 @@ public class ChunkyResident {
 
     public void logout() {
         setPlayTime(getPlayTime());
-        chunkyPlayer.getData().remove("village-lastJoin");
-        chunkyPlayer.save();
+        getData().remove(LAST_JOIN);
+        save();
     }
 
     public void login() {
-        chunkyPlayer.getData().put("village-lastJoin", System.currentTimeMillis());
-        chunkyPlayer.save();
+        getData().put(LAST_JOIN, System.currentTimeMillis());
+        save();
     }
 
     public void setPlayTime(long playTime) {
-        chunkyPlayer.getData().put("village-playTime", playTime);
-        chunkyPlayer.save();
+        getData().put(PLAY_TIME, playTime);
+        save();
     }
 
     public void subtractPlayTime(long playTime) {
@@ -75,16 +97,16 @@ public class ChunkyResident {
     public long getPlayTime() {
         long curTime = System.currentTimeMillis();
         long joinTime = curTime;
-        if(chunkyPlayer.getData().has("village-lastJoin")) joinTime = chunkyPlayer.getData().getLong("village-lastJoin");
+        if(getData().has(LAST_JOIN)) joinTime = getData().getLong(LAST_JOIN);
         long playTime = 0;
-        if(chunkyPlayer.getData().has("village-playTime")) playTime = chunkyPlayer.getData().getLong("village-playTime");
+        if(getData().has(PLAY_TIME)) playTime = getData().getLong(PLAY_TIME);
         return playTime + (curTime-joinTime)/(1000*60);
 
     }
 
     public void setTitle(String title) {
-        chunkyPlayer.getData().put("village-title", title);
-        chunkyPlayer.save();
+        getData().put(TITLE, title);
+        save();
         applyTitle();
     }
 
@@ -94,16 +116,16 @@ public class ChunkyResident {
         } catch (ChunkyPlayerOfflineException e) {}}
 
     public void removeTitle() {
-        chunkyPlayer.getData().remove("village-title");
-        chunkyPlayer.save();
+        getData().remove(TITLE);
+        save();
     }
 
     public boolean hasTitle() {
-        return chunkyPlayer.getData().has("village-title");
+        return getData().has(TITLE);
     }
 
     public String getTitle() {
-        return chunkyPlayer.getData().getString("village-title");}
+        return getData().getString(TITLE);}
 
     public boolean isMayor() {
         ChunkyTown chunkyTown = getTown();
@@ -121,7 +143,7 @@ public class ChunkyResident {
     }
 
     public String getName() {
-        return chunkyPlayer.getName();
+        return getChunkyPlayer().getName();
     }
 
     public Method.MethodAccount getAccount() {
@@ -136,12 +158,51 @@ public class ChunkyResident {
     }
 
     public boolean owns(ChunkyObject chunkyObject) {
-        return chunkyPlayer.isOwnerOf(chunkyObject);
+        return getChunkyPlayer().isOwnerOf(chunkyObject) || getChunkyPlayer().hasPerm(chunkyObject, ChunkyPermissions.OWNER);
+    }
+
+    /**
+     * Adds a town chunk to the residents list of owned chunks.  This is called on TownChunk.setResidentOwner()
+     *
+     * @param townChunk Chunk to add to "ownership"
+     * @return true if the resident did not already own the chunk
+     */
+    protected boolean addOwnedTownChunk(TownChunk townChunk) {
+        if (getOwnedTownChunks().contains(townChunk)) return false;
+        getTownChunkData().put(townChunk.getChunkyChunk().getId());
+        save();
+        return true;
+    }
+
+    /**
+     * Removes a town chunk from the residents list of owned chunks.  This is called on TownChunk.setResidentOwner()
+     *
+     * @param townChunk Chunky to remove from "ownership"
+     * @return true if the chunk was found in the list and removed
+     */
+    protected boolean removeOwnedTownChunk(TownChunk townChunk) {
+        for (int i = 0; i < getTownChunkData().length(); i++) {
+            if (getTownChunkData().get(i).toString().equals(townChunk.getChunkyChunk().getId())) {
+                getTownChunkData().remove(i);
+                save();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public HashSet<TownChunk> getOwnedTownChunks() {
+        HashSet<TownChunk> chunks = new HashSet<TownChunk>();
+        for (int i = 0; i < getTownChunkData().length(); i++) {
+            chunks.add(new TownChunk((ChunkyChunk)ChunkyManager.getObject(ChunkyChunk.class.getName(), getTownChunkData().get(i).toString())));
+        }
+        return chunks;
     }
 
     public ChunkyTown.Stance getEffectiveStance(ChunkyResident chunkyResident) {
         return ChunkyTownManager.getStance(this.getChunkyPlayer(), chunkyResident.getChunkyPlayer());
     }
+
 
     @Override
     public boolean equals(Object obj) {
@@ -149,12 +210,26 @@ public class ChunkyResident {
     }
 
     public JSONObject getData() {
-        return chunkyPlayer.getData();
+        JSONObject data = this.getChunkyPlayer().getData().optJSONObject("ChunkyVillage");
+        if (data == null) {
+            data = new JSONObject();
+            this.getChunkyPlayer().getData().put("ChunkyVillage", data);
+        }
+        return data;
     }
 
-    public void save() {
-        chunkyPlayer.save();
+    public JSONArray getTownChunkData() {
+        JSONArray data = this.getData().optJSONArray("Town Chunks");
+        if (data == null) {
+            data = new JSONArray();
+            this.getChunkyPlayer().getData().put("Town Chunks", data);
+        }
+        return data;
     }
 
+    public ChunkyResident save() {
+        getChunkyPlayer().save();
+        return this;
+    }
 
 }

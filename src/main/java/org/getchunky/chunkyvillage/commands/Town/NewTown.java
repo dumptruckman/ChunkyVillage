@@ -42,7 +42,7 @@ public class NewTown implements ChunkyCommandExecutor{
         String id = strings[0];
         ChunkyTown chunkyTown = new ChunkyTown();
         chunkyTown.setId(ChunkyManager.getUniqueId());
-        chunkyTown.setMayor(chunkyResident).setHome(chunkyChunk).setName(id);
+        chunkyTown.setMayor(chunkyResident).setHome(chunkyChunk).addResident(chunkyResident).setName(id);
         chunkyChunk.setOwner(chunkyTown, true,true);
         chunkyChunk.save();
         Language.sendGood(chunkyResident.getChunkyPlayer(),"You've just created a town called " + chunkyTown.getName());

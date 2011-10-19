@@ -22,6 +22,7 @@ public class Config {
         MAYOR_TITLE("settings.town.defaultMayorTitle", "&6Mayor&f"),
         ASSISTANT_TITLE("settings.town.defaultAssistantTitle", "&5Assistant&f"),
         TELEPORT_WARMUP("settings.town.teleportWarmup", 10),
+        NO_PRIVATE_OWNERSHIP("setting.town.residents.no_private_ownership", true),
         LANGUAGE_FILE("settings.language", "english.yml"),
 
         AUTOUPDATE("settings.autoUpdate", true),
@@ -51,7 +52,9 @@ public class Config {
         public double getDouble() {
             return configuration.getDouble(path, (Double)def);}
 
-
+        public Boolean getBoolean() {
+            return configuration.getBoolean(path, (Boolean)def);
+        }
     }
 
     public static void load() {

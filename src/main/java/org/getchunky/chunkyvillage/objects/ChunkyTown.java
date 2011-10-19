@@ -12,6 +12,7 @@ import org.getchunky.chunky.object.ChunkyGroup;
 import org.getchunky.chunky.object.ChunkyObject;
 import org.getchunky.chunky.object.ChunkyPlayer;
 import org.getchunky.chunky.permission.PermissionFlag;
+import org.getchunky.chunkyvillage.config.Config;
 import org.getchunky.register.payment.Method;
 import org.json.JSONObject;
 
@@ -23,7 +24,11 @@ import static org.getchunky.chunkyvillage.config.Config.Options;
 import static org.getchunky.chunkyvillage.config.Config.Options.ELECTION_PERCENTAGE;
 import static org.getchunky.chunkyvillage.config.Config.Options.INFLUENCE_PER_VOTE;
 
-public class ChunkyTown extends ChunkyObject {
+public class ChunkyTown extends ChunkyGroup {
+
+    public static PermissionFlag ASSISTANT = new PermissionFlag("Assistant", "A");
+
+    //private static String MAYOR = "mayor";
 
     public ChunkyGroup getAssistantGroup() {
         ChunkyGroup assistants = (ChunkyGroup)ChunkyManager.getObject(ChunkyGroup.class.getName(), getAssistantGroupId());
@@ -31,13 +36,20 @@ public class ChunkyTown extends ChunkyObject {
             assistants = new ChunkyGroup();
             assistants.setId(getAssistantGroupId()).setName(getAssistantGroupId());
             HashMap<PermissionFlag, Boolean> flags = new HashMap<PermissionFlag, Boolean>();
-            flags.put(ChunkyPermissions.BUILD, true);
-            flags.put(ChunkyPermissions.SWITCH, true);
-            flags.put(ChunkyPermissions.DESTROY, true);
-            flags.put(ChunkyPermissions.ITEM_USE, true);
+            flags.put(ASSISTANT, true);
             ChunkyManager.setPermissions(this, assistants, flags);}
-
+        
         return assistants;
+    }
+
+    public ChunkyGroup getResidentGroup() {
+        ChunkyGroup residents = (ChunkyGroup)ChunkyManager.getObject(ChunkyGroup.class.getName(), getAssistantGroupId());
+        if(residents == null) {
+            residents = new ChunkyGroup();
+            residents.setId(getResidentGroupId()).setName(getResidentGroupId());
+        }
+
+        return residents;
     }
 
     public HashSet<ChunkyObject> getAssistants() {
@@ -46,7 +58,17 @@ public class ChunkyTown extends ChunkyObject {
         return new HashSet<ChunkyObject>();
     }
 
+    public HashSet<ChunkyObject> getResidents() {
+        HashSet<ChunkyObject> result = getResidentGroup().getMembers().get(ChunkyPlayer.class.getName());
+        if(result != null) return result;
+        return new HashSet<ChunkyObject>();
+    }
+
     private String getAssistantGroupId() {
+        return getId() + "-assistants";
+    }
+
+    private String getResidentGroupId() {
         return getId() + "-assistants";
     }
 
@@ -76,12 +98,12 @@ public class ChunkyTown extends ChunkyObject {
     public ChunkyTown setMayor(ChunkyResident mayor) {
         ChunkyObject oldOwner = this.getOwner();
         this.setOwner(mayor.getChunkyPlayer(), true, false);
-        if(oldOwner!=null) {
-            oldOwner.getData().remove("village-title");
-            oldOwner.setOwner(this, true, false);
-            oldOwner.getData().remove("mayor");
-            oldOwner.save();}
-        mayor.getData().put("mayor",this.getId());
+        if(oldOwner != null && oldOwner instanceof ChunkyPlayer) {
+            ChunkyResident oldOwnerRes = new ChunkyResident(oldOwner);
+            oldOwnerRes.removeTitle();
+            oldOwnerRes.save();
+        }
+        //mayor.getData().put(MAYOR, this.getId());
         mayor.setTitle(Options.MAYOR_TITLE.getString());
         mayor.save();
         return this;
@@ -100,12 +122,12 @@ public class ChunkyTown extends ChunkyObject {
         return Chunky.getMethod().getAccount("town-" + this.getId());
     }
 
-    public HashSet<ChunkyObject> getResidents() {
+    /*public HashSet<ChunkyObject> getResidents() {
         HashSet<ChunkyObject> ret = new HashSet<ChunkyObject>();
         if(this.getOwnables().get(ChunkyPlayer.class.getName())!=null) ret.addAll(this.getOwnables().get(ChunkyPlayer.class.getName()));
         ret.add(getMayor().getChunkyPlayer());
         return ret;
-    }
+    }*/
 
     public boolean deposit(ChunkyResident buyer, double amount) {
         Method.MethodAccount source = buyer.getAccount();
@@ -133,13 +155,23 @@ public class ChunkyTown extends ChunkyObject {
     }
 
     public ChunkyTown addResident(ChunkyResident chunkyResident) {
-        chunkyResident.getChunkyPlayer().setOwner(this, false, true);
+        ChunkyGroup residents = getResidentGroup();
+        residents.addMember(chunkyResident.getChunkyPlayer());
+        if (Options.NO_PRIVATE_OWNERSHIP.getBoolean()) {
+            // Transfer ownership of player's chunks to the town and give owner permissions to the player
+            for (ChunkyObject obj : chunkyResident.getChunkyPlayer().getOwnables().get(ChunkyChunk.class.getName())) {
+                obj.setOwner(this, true, false);
+                chunkyResident.getChunkyPlayer().setPerm(obj, ChunkyPermissions.OWNER, true);
+                TownChunk townChunk = new TownChunk((ChunkyChunk)obj);
+                townChunk.setResidentOwner(chunkyResident);
+            }
+        }
         chunkyResident.setPlayTime(0);
         return this;
     }
 
     public ChunkyTown kickResident(ChunkyResident chunkyResident) {
-        chunkyResident.getChunkyPlayer().setOwner(null, false, true);
+        getResidentGroup().removeMember(chunkyResident.getChunkyPlayer());
         chunkyResident.removeTitle();
         return this;
     }
@@ -231,8 +263,7 @@ public class ChunkyTown extends ChunkyObject {
                 }
                 chunkyObject.setOwner(null,true,false);
             }}
-        this.getOwner().getData().remove("mayor");
-        this.getOwner().save();
+        //getData().remove(MAYOR);
         this.setOwner(null,false,true);
         save();
         delete();

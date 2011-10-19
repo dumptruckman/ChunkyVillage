@@ -7,10 +7,12 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkitstats.CallHome;
 import org.getchunky.chunky.Chunky;
+import org.getchunky.chunky.ChunkyManager;
 import org.getchunky.chunky.event.ChunkyEvent;
 import org.getchunky.chunky.exceptions.ChunkyUnregisteredException;
 import org.getchunky.chunky.locale.Language;
 import org.getchunky.chunky.module.ChunkyCommand;
+import org.getchunky.chunky.module.ChunkyPermissions;
 import org.getchunky.chunkyvillage.commands.Admin.Admin;
 import org.getchunky.chunkyvillage.commands.Admin.AdminAddResident;
 import org.getchunky.chunkyvillage.commands.Admin.AdminKickResident;
@@ -25,6 +27,7 @@ import org.getchunky.chunkyvillage.config.Config;
 import org.getchunky.chunkyvillage.listeners.ChunkyEvents;
 import org.getchunky.chunkyvillage.listeners.PlayerEvents;
 import org.getchunky.chunkyvillage.locale.Strings;
+import org.getchunky.chunkyvillage.objects.ChunkyTown;
 import org.getchunky.chunkyvillage.util.Updater;
 
 public class ChunkyVillage extends JavaPlugin {
@@ -169,5 +172,9 @@ public class ChunkyVillage extends JavaPlugin {
         } catch (ChunkyUnregisteredException e) {
             e.printStackTrace();
         }
+    }
+
+    public void registerChunkyPermissions() {
+        ChunkyPermissions.registerPermissionFlag(ChunkyTown.ASSISTANT);
     }
 }

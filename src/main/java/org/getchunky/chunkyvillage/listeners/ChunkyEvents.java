@@ -13,6 +13,7 @@ import org.getchunky.chunky.event.object.player.ChunkyPlayerListener;
 import org.getchunky.chunky.locale.Language;
 import org.getchunky.chunky.object.ChunkyChunk;
 import org.getchunky.chunky.object.ChunkyCoordinates;
+import org.getchunky.chunky.permission.AccessLevel;
 import org.getchunky.chunkyvillage.ChunkyTownManager;
 import org.getchunky.chunkyvillage.ChunkyVillage;
 import org.getchunky.chunkyvillage.config.Config;
@@ -80,12 +81,34 @@ public class ChunkyEvents extends ChunkyPlayerListener {
         ChunkyTown chunkTown = toChunk.getTown();
         if(myTown == null || chunkTown == null) return;
 
-        if(toChunk.isForSale())
-            event.setMessage(event.getToChunk().getOwner().getName() + " - on sale for: " + ChatColor.YELLOW  + Chunky.getMethod().format(toChunk.getCost()));
+        if(toChunk.isForSale()) {
+            String ownerName;
+            if (toChunk.hasResidentOwner())
+                ownerName = toChunk.getResidentOwner().getName();
+            else
+                ownerName = event.getToChunk().getOwner().getName();
+            event.setMessage(ownerName + " - on sale for: " + ChatColor.YELLOW  + Chunky.getMethod().format(toChunk.getCost()));
+        }
     }
 
     @Override
     public void onPlayerUnownedBuild(ChunkyPlayerBuildEvent event) {
+
+        // TODO Does this work for assistant override on non-owned town chunks?
+        ChunkyResident resident = new ChunkyResident(event.getChunkyPlayer());
+        if (resident.isAssistant()) {
+            TownChunk townChunk = new TownChunk(event.getChunkyChunk());
+            if (!townChunk.hasResidentOwner() && townChunk.getTown() != null && resident.getTown() != null && townChunk.getTown().equals(resident.getTown())) {
+                AccessLevel level = event.getAccessLevel();
+                if (level.causedDenial()) {
+                    if (level != AccessLevel.DIRECT_PERMISSION && level != AccessLevel.GLOBAL_PERMISSION) {
+                        event.setCancelled(false);
+                        level.setDenied(false);
+                    }
+                }
+            }
+        }
+
         Block block = event.getBlock();
 
         if(!Config.isWarTool(block.getTypeId())) return;
@@ -118,7 +141,6 @@ public class ChunkyEvents extends ChunkyPlayerListener {
         else Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(ChunkyVillage.getInstance(), new RemoveBlock(block), 20L * 20);
 
         Language.sendGood(attacker.getChunkyPlayer(), "That cost " + cost + " Influence");
-
 
     }
 }

@@ -5,6 +5,7 @@ import org.getchunky.chunky.Chunky;
 import org.getchunky.chunky.ChunkyManager;
 import org.getchunky.chunky.object.ChunkyObject;
 import org.getchunky.chunky.object.ChunkyPlayer;
+import org.getchunky.chunkyvillage.objects.ChunkyResident;
 import org.getchunky.chunkyvillage.objects.ChunkyTown;
 import org.getchunky.register.payment.Method;
 import org.json.JSONException;
@@ -22,10 +23,11 @@ public class ChunkyTownManager {
     }
 
     public static ChunkyTown getTown(ChunkyPlayer chunkyPlayer) {
-        if(chunkyPlayer.getOwner() != null && chunkyPlayer.getOwner() instanceof ChunkyTown) return (ChunkyTown)chunkyPlayer.getOwner();
+        /**if(chunkyPlayer.getOwner() != null && chunkyPlayer.getOwner() instanceof ChunkyTown) return (ChunkyTown)chunkyPlayer.getOwner();
         ChunkyTown chunkyTown = isMayor(chunkyPlayer);
         if(chunkyTown != null) return chunkyTown;
-        return null;
+        return null;**/
+        return new ChunkyResident(chunkyPlayer).getTown();
     }
 
     public static ChunkyTown matchTown(String input) {
@@ -33,13 +35,6 @@ public class ChunkyTownManager {
         for(ChunkyObject chunkyObject : ChunkyTownManager.getTowns().values()) {
             if(chunkyObject.getName().toLowerCase().contains(n)) return (ChunkyTown)chunkyObject;}
         return null;
-    }
-
-    public static ChunkyTown isMayor (ChunkyPlayer chunkyPlayer) {
-        try {
-            String id = chunkyPlayer.getData().getString("mayor");
-            return getTown(id);
-        } catch (JSONException e) {return null;}
     }
 
     public static Method.MethodAccount getAccount(ChunkyObject chunkyObject) {
